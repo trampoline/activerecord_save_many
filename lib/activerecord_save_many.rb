@@ -2,15 +2,55 @@ require 'set'
 
 module ActiveRecord
   module SaveMany
+    MAX_QUERY_SIZE = 1024 * 1024
+    OPTIONS_KEYS = [:columns, :max_rows, :async, :ignore, :update, :updates].to_set
+
     class << self
       attr_accessor :default_max_rows
     end
     self.default_max_rows = 50000
 
-    module ClassMethods
-      MAX_QUERY_SIZE = 1024 * 1024
-      OPTIONS_KEYS = [:columns, :max_rows, :insert_delayed, :ignore, :update, :updates].to_set
+    module Functions
+      def rails_env
+        RAILS_ENV if defined? RAILS_ENV
+      end
+      module_function :rails_env
 
+      def disable_async?
+        # for predictable tests we disable delayed insert during testing
+        rails_env()=="test"
+      end
+      module_function :disable_async?
+
+      def check_options(options)
+        unknown_keys = options.keys.to_set - OPTIONS_KEYS.to_set
+        raise "unknown options: #{unknown_keys.to_a.join(", ")}" if !unknown_keys.empty?
+      end
+      module_function :check_options
+
+      # slice an array into smaller arrays with maximum size max_size
+      def slice_array(max_length, arr)
+        slices = []
+        (0..arr.length-1).step( max_length ){ |i| slices << arr.slice(i,max_length) }
+        slices
+      end
+      module_function :slice_array
+
+      def add_columns(klass, values, options)
+        columns = options[:columns] || klass.columns.map(&:name)
+
+        # add a :type column automatically for STI, if not already present
+        if klass.superclass!=ActiveRecord::Base && !columns.include?(:type)
+          columns = [:type, *columns]
+          values = values.map{|vals| [klass.to_s, *vals]}
+        end
+
+        [columns, values]
+      end
+      module_function :add_columns
+    end
+
+    module ClassMethods
       def save_many_max_rows=(max_rows)
         @save_many_max_rows=max_rows
       end
@@ -19,38 +59,15 @@ module ActiveRecord
         @save_many_max_rows || ActiveRecord::SaveMany::default_max_rows
       end
 
-      def disable_delayed_insert?
-        # for predictable tests we disable delayed insert during testing
-        RAILS_ENV=="test" if defined? RAILS_ENV
-      end
-
-      def check_options(options)
-        unknown_keys = options.keys.to_set - OPTIONS_KEYS.to_set
-        raise "unknown options: #{unknown_keys.join(", ")}" if !unknown_keys.empty?
-      end
-
-      # slice an array into smaller arrays with maximum size max_size
-      def slice_array(max_length, arr)
-        slices = []
-        (0..arr.length-1).step( max_length ){ |i| slices << values.slice(i,max_length) }
-        slices
-      end
-
-      def save_many(values, options={} )
-        check_options(options)
+      def save_many(values, options={})
+        Functions::check_options(options)
         return if values.nil? || values.empty?
 
-        columns = options[:columns] || self.columns.map(&:name)
-
-        # add a :type column automatically for STI, if not already present
-        if self.superclass!=ActiveRecord::Base && !columns.include?(:type)
-          columns = [:type, *columns]
-          values = values.map{|vals| [to_s, *vals]}
-        end
+        columns, values = Functions::add_columns(self, values, options)
 
         # if more than max_rows, execute multiple sql statements
         max_rows = options[:max_rows] || save_many_max_rows
-        batches = slice_array(max_rows, values)
+        batches = Functions::slice_array(max_rows, values)
 
         column_list = columns.join(', ')
         do_updates = options[:update] || options[:updates]
@@ -70,7 +87,7 @@ module ActiveRecord
             columns.map{|col| obj[col]}
           end
 
-          insert_stmt = options[:insert_delayed] && !disable_delayed_insert? ? "insert delayed" : "insert"
+          insert_stmt = options[:async] && !disable_async? ? "insert delayed" : "insert"
           ignore_opt = options[:ignore] ? "ignore" : ""
           
           sql = "#{insert_stmt} #{ignore_opt} into #{table_name} (#{column_list}) values " + 
