@@ -92,7 +92,7 @@ module ActiveRecord
           
           sql = "#{insert_stmt} #{ignore_opt} into #{table_name} (#{column_list}) values " + 
             batch.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(", ") +")"}.join(", ") +
-            (" on duplicate key update " + columns.map{|c| updates[c] || " #{c} = values(#{c}) "}.join(", ") if do_updates)
+            (" on duplicate key update " + columns.map{|c| updates[c] || " #{c} = values(#{c}) "}.join(", ") if do_updates).to_s
 
           connection.execute_raw sql
         end
