@@ -99,6 +99,89 @@ module ActiveRecord
       k2.save_many_max_rows.should == 100
     end
 
-    
+    # argh. am i really testing the correct sql is generated ?
+    describe "save_many" do
+      def new_ar_stub(classname, column_names, tablename, match_sql)
+        k=new_ar_class(classname)
+        stub(k).table_name{tablename}
+        cns = column_names.map{|cn| col=Object.new ; stub(col).name{cn} ; col}
+        stub(k).columns{cns}
+        stub(k).quote_value{|v| "'#{v}'"}
+        stub(k).connection.stub!.execute_raw{|sql| 
+          sql.should == match_sql
+        }
+        k
+      end
+
+      def new_ar_inst(klass, id, valid, field_hash)
+        kinst = klass.new
+        mock(kinst).id(){id}
+        mock(kinst).callback(:before_save)
+        if id
+          mock(kinst).callback(:before_update)
+        else
+          mock(kinst).callback(:before_create)
+        end
+        mock(kinst).valid?(){valid}
+
+        field_hash.keys.each{ |key|
+          mock(kinst).[](key){field_hash[key]}
+        }
+        kinst
+      end
+
+      it "should generate extended insert sql for all model columns with new objects" do
+        k=new_ar_stub("Foo", [:foo, :bar], "foos", "insert into foos (foo,bar) values ('foofoo','barbar')")
+        kinst = new_ar_inst(k, nil, true, {:foo=>"foofoo", :bar=>"barbar"})
+        k.save_many([kinst])
+      end
+
+      it "should generate extended insert sql for all model columns with existing objects" do
+        k=new_ar_stub("Foo", [:id, :foo, :bar], "foos", "insert into foos (id,foo,bar) values ('100','foofoo','barbar')")
+        kinst = new_ar_inst(k, '100', true, {:foo=>"foofoo", :bar=>"barbar", :id=>'100'})
+        k.save_many([kinst])
+      end
+
+      it "should generate extended insert sql for all model columns for multiple model instances" do
+        k=new_ar_stub("Foo", [:foo, :bar], "foos", 
+                      "insert into foos (foo,bar) values ('foofoo','barbar'),('foofoofoo','barbarbar')")
+        kinst = new_ar_inst(k, nil, true, {:foo=>"foofoo", :bar=>"barbar"})
+        kinst2 = new_ar_inst(k, nil, true, {:foo=>"foofoofoo", :bar=>"barbarbar"})
+        k.save_many([kinst,kinst2])
+      end
+
+      it "should generate simple extended insert sql for specified columns" do
+        k=new_ar_stub("Foo", [:foo, :bar], "foos", "insert into foos (foo) values ('foofoo')")
+        kinst = new_ar_inst(k, nil, true, {:foo=>"foofoo"})
+        k.save_many([kinst], :columns=>[:foo])
+      end
+
+      it "should generate simple extended insert sql for specified string-name columns" do
+        k=new_ar_stub("Foo", ["foo", "bar"], "foos", "insert into foos (foo) values ('foofoo')")
+        kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
+        k.save_many([kinst], :columns=>["foo"])
+      end
+
+      it "should generate insert delayed sql if :async param give " do
+        k=new_ar_stub("Foo", [:foo], "foos", "insert delayed into foos (foo) values ('foofoo')")
+        kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
+        k.save_many([kinst], :columns=>["foo"], :async=>true)
+      end
+
+      it "should generate insert ignore sql if :ignore param given" do
+        k=new_ar_stub("Foo", [:foo], "foos", "insert ignore into foos (foo) values ('foofoo')")
+        kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
+        k.save_many([kinst], :columns=>["foo"], :ignore=>true)
+      end
+
+      it "should generate update sql with all columns if :update given" do
+        k=new_ar_stub("Foo", [:foo], "foos", 
+                      "insert into foos (foo) values ('foofoo') on duplicate key update foo=values(foo)")
+        kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
+        k.save_many([kinst], :columns=>["foo"], :update=>true)
+      end
+
+    end
+
   end
 end

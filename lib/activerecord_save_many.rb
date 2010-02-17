@@ -69,7 +69,6 @@ module ActiveRecord
         max_rows = options[:max_rows] || save_many_max_rows
         batches = Functions::slice_array(max_rows, values)
 
-        column_list = columns.join(', ')
         do_updates = options[:update] || options[:updates]
         updates = options[:updates] || {}
 
@@ -87,12 +86,13 @@ module ActiveRecord
             columns.map{|col| obj[col]}
           end
 
-          insert_stmt = options[:async] && !disable_async? ? "insert delayed" : "insert"
-          ignore_opt = options[:ignore] ? "ignore" : ""
+          delayed_opt = options[:async] && !Functions::disable_async? ? "delayed" : nil
+          ignore_opt = options[:ignore] ? "ignore" : nil
           
-          sql = "#{insert_stmt} #{ignore_opt} into #{table_name} (#{column_list}) values " + 
-            batch.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(", ") +")"}.join(", ") +
-            (" on duplicate key update " + columns.map{|c| updates[c] || " #{c} = values(#{c}) "}.join(", ") if do_updates).to_s
+          sql = ["insert", delayed_opt, ignore_opt].compact.join(' ') + 
+            " into #{table_name} (#{columns.join(',')}) values " + 
+            batch.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(",") +")"}.join(",") +
+            (" on duplicate key update "+columns.map{|c| updates[c] || "#{c}=values(#{c})"}.join(",") if do_updates).to_s
 
           connection.execute_raw sql
         end
