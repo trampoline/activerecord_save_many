@@ -1,4 +1,5 @@
 require 'set'
+require 'activerecord_execute_raw'
 
 module ActiveRecord
   module SaveMany

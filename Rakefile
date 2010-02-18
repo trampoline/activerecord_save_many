@@ -10,6 +10,7 @@ begin
     gem.email = "craig@trampolinesystems.com"
     gem.homepage = "http://github.com/trampoline/activerecord_save_many"
     gem.authors = ["mccraigmccraig"]
+    gem.add_dependency "activerecord_execute_raw", ">= 0.1.0"
     gem.add_development_dependency "rspec", ">= 1.2.9"
     gem.add_development_dependency "yard", ">= 0"
     gem.add_development_dependency "rr", ">= 0.10.5"
