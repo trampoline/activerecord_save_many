@@ -37,7 +37,7 @@ module ActiveRecord
       describe "check_options" do
         it "should raise if given unknown options" do
           lambda do
-            SaveMany::Functions::check_options(:foo=>100)
+            SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :foo=>100)
           end.should raise_error(RuntimeError)
         end
       end
@@ -106,10 +106,12 @@ module ActiveRecord
         stub(k).table_name{tablename}
         cns = column_names.map{|cn| col=Object.new ; stub(col).name{cn} ; col}
         stub(k).columns{cns}
-        stub(k).quote_value{|v| "'#{v}'"}
-        stub(k).connection.stub!.execute_raw{|sql| 
+        connection = ActiveRecord::ConnectionAdapters::MysqlAdapter.new
+        stub(connection).quote_value{|v| "'#{v}'"}
+        stub(connection).execute_raw{|sql| 
           sql.should == match_sql
         }
+        stub(k).connection{connection}
         k
       end
 

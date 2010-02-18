@@ -3,7 +3,11 @@ require 'set'
 module ActiveRecord
   module SaveMany
     MAX_QUERY_SIZE = 1024 * 1024
+    # options for the create_many method
     OPTIONS_KEYS = [:columns, :max_rows, :async, :ignore, :update, :updates].to_set
+
+    # options for the create_many_sql method
+    SQL_OPTIONS_KEYS = [:async, :ignore, :update, :updates].to_set
 
     class << self
       attr_accessor :default_max_rows
@@ -22,12 +26,12 @@ module ActiveRecord
       end
       module_function :disable_async?
 
-      def check_options(options)
-        unknown_keys = options.keys.to_set - OPTIONS_KEYS.to_set
+      def check_options(permitted, options)
+        unknown_keys = options.keys.to_set - permitted
         raise "unknown options: #{unknown_keys.to_a.join(", ")}" if !unknown_keys.empty?
       end
       module_function :check_options
-
+      
       # slice an array into smaller arrays with maximum size max_size
       def slice_array(max_length, arr)
         slices = []
@@ -60,7 +64,7 @@ module ActiveRecord
       end
 
       def save_many(values, options={})
-        Functions::check_options(options)
+        Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS , options)
         return if values.nil? || values.empty?
 
         columns, values = Functions::add_columns(self, values, options)
@@ -69,11 +73,8 @@ module ActiveRecord
         max_rows = options[:max_rows] || save_many_max_rows
         batches = Functions::slice_array(max_rows, values)
 
-        do_updates = options[:update] || options[:updates]
-        updates = options[:updates] || {}
-
-        batches.each do |batch|
-          batch = batch.map do |obj|
+        batches.each do |rows|
+          rows = rows.map do |obj|
             if obj.is_a? ActiveRecord::Base
               obj.send( :callback, :before_save )
               if obj.id
@@ -86,16 +87,27 @@ module ActiveRecord
             columns.map{|col| obj[col]}
           end
 
-          delayed_opt = options[:async] && !Functions::disable_async? ? "delayed" : nil
-          ignore_opt = options[:ignore] ? "ignore" : nil
+          sql = connection.save_many_sql(table_name, 
+                                         columns, 
+                                         rows, 
+                                         { :ignore=>options[:ignore],
+                                           :async=>options[:async] && !Functions::disable_async?(),
+                                           :update=>options[:update] || options[:updates],
+                                           :updates=>options[:updates] || {} })
           
-          sql = ["insert", delayed_opt, ignore_opt].compact.join(' ') + 
-            " into #{table_name} (#{columns.join(',')}) values " + 
-            batch.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(",") +")"}.join(",") +
-            (" on duplicate key update "+columns.map{|c| updates[c] || "#{c}=values(#{c})"}.join(",") if do_updates).to_s
-
           connection.execute_raw sql
         end
+      end
+    end
+
+    module MySQL
+      def save_many_sql(table_name, columns, rows, options)
+        Functions::check_options(SQL_OPTIONS_KEYS, options)
+        
+        sql = ["insert", ("delayed" if options[:async]), ("ignore" if options[:ignore])].compact.join(' ') + 
+          " into #{table_name} (#{columns.join(',')}) values " + 
+          rows.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(",") +")"}.join(",") +
+          (" on duplicate key update "+columns.map{|c| options[:updates][c] || "#{c}=values(#{c})"}.join(",") if options[:update]).to_s
       end
     end
   end
@@ -103,6 +115,20 @@ module ActiveRecord
   class Base
     class << self
       include ActiveRecord::SaveMany::ClassMethods
+    end
+  end
+end
+
+module JdbcSpec
+  module MySQL
+    include ActiveRecord::SaveMany::MySQL
+  end
+end
+
+module ActiveRecord
+  module ConnectionAdapters
+    class MysqlAdapter
+      include ActiveRecord::SaveMany::MySQL
     end
   end
 end
