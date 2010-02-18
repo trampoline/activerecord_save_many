@@ -87,7 +87,8 @@ module ActiveRecord
             columns.map{|col| obj[col]}
           end
 
-          sql = connection.save_many_sql(table_name, 
+          sql = connection.save_many_sql(self,
+                                         table_name, 
                                          columns, 
                                          rows, 
                                          { :ignore=>options[:ignore],
@@ -101,12 +102,12 @@ module ActiveRecord
     end
 
     module MySQL
-      def save_many_sql(table_name, columns, rows, options)
+      def save_many_sql(klass, table_name, columns, rows, options)
         Functions::check_options(SQL_OPTIONS_KEYS, options)
         
         sql = ["insert", ("delayed" if options[:async]), ("ignore" if options[:ignore])].compact.join(' ') + 
           " into #{table_name} (#{columns.join(',')}) values " + 
-          rows.map{|vals| "(" + vals.map{|v| quote_value(v)}.join(",") +")"}.join(",") +
+          rows.map{|vals| "(" + vals.map{|v| klass.quote_value(v)}.join(",") +")"}.join(",") +
           (" on duplicate key update "+columns.map{|c| options[:updates][c] || "#{c}=values(#{c})"}.join(",") if options[:update]).to_s
       end
     end

@@ -106,8 +106,8 @@ module ActiveRecord
         stub(k).table_name{tablename}
         cns = column_names.map{|cn| col=Object.new ; stub(col).name{cn} ; col}
         stub(k).columns{cns}
+        stub(k).quote_value{|v| "'#{v}'"}
         connection = ActiveRecord::ConnectionAdapters::MysqlAdapter.new
-        stub(connection).quote_value{|v| "'#{v}'"}
         stub(connection).execute_raw{|sql| 
           sql.should == match_sql
         }
