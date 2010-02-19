@@ -5,8 +5,8 @@ SQL for inserting or updating many ActiveRecord instances in one go
 
 == Install
 
-gem source --add http://gemcutter.org
-gem install activerecord_execute_raw
+  gem source --add http://gemcutter.org
+  gem install activerecord_save_many
 
 == Note on Patches/Pull Requests
  
