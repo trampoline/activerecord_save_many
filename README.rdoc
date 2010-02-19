@@ -3,6 +3,11 @@
 adds a save_many method to ActiveRecord classes. save_many generates reasonable
 SQL for inserting or updating many ActiveRecord instances in one go
 
+== Install
+
+gem source --add http://gemcutter.org
+gem install activerecord_execute_raw
+
 == Note on Patches/Pull Requests
  
 * Fork the project.
