@@ -1,6 +1,6 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
-require 'activerecord_save_many'
+require 'activerecord_save_many/save_many'
 require 'spec'
 require 'spec/autorun'
 
