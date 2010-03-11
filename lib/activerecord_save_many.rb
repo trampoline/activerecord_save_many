@@ -1,3 +1,3 @@
 require 'activerecord_execute_raw'
-require 'active_record_save_many/save_many'
+require 'activerecord_save_many/save_many'
 
