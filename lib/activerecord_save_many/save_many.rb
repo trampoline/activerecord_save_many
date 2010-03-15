@@ -4,10 +4,10 @@ module ActiveRecord
   module SaveMany
     MAX_QUERY_SIZE = 1024 * 1024
     # options for the create_many method
-    OPTIONS_KEYS = [:columns, :max_rows, :async, :ignore, :update, :updates].to_set
+    OPTIONS_KEYS = [:columns, :max_rows, :replace, :async, :ignore, :update, :updates].to_set
 
-    # options for the create_many_sql method
-    SQL_OPTIONS_KEYS = [:async, :ignore, :update, :updates].to_set
+    # options for the save_many_sql method
+    SQL_OPTIONS_KEYS = [:replace, :async, :ignore, :update, :updates].to_set
 
     class << self
       attr_accessor :default_max_rows
@@ -29,6 +29,7 @@ module ActiveRecord
       def check_options(permitted, options)
         unknown_keys = options.keys.to_set - permitted
         raise "unknown options: #{unknown_keys.to_a.join(", ")}" if !unknown_keys.empty?
+        raise "can't :replace and :ignore||:update||:async" if options[:replace] && (options[:ignore] || options[:update] || options[:updates] || options[:async])
       end
       module_function :check_options
       
@@ -91,7 +92,8 @@ module ActiveRecord
                                          table_name, 
                                          columns, 
                                          rows, 
-                                         { :ignore=>options[:ignore],
+                                         { :replace=>options[:replace],
+                                           :ignore=>options[:ignore],
                                            :async=>options[:async] && !Functions::disable_async?(),
                                            :update=>options[:update] || options[:updates],
                                            :updates=>options[:updates] || {} })
@@ -103,9 +105,10 @@ module ActiveRecord
 
     module MySQL
       def save_many_sql(klass, table_name, columns, rows, options)
-        Functions::check_options(SQL_OPTIONS_KEYS, options)
         
-        sql = ["insert", ("delayed" if options[:async]), ("ignore" if options[:ignore])].compact.join(' ') + 
+        sql = [(if options[:replace] then "replace" else "insert" end), 
+               ("delayed" if options[:async]), 
+               ("ignore" if options[:ignore])].compact.join(' ') + 
           " into #{table_name} (#{columns.join(',')}) values " + 
           rows.map{|vals| "(" + vals.map{|v| klass.quote_value(v)}.join(",") +")"}.join(",") +
           (" on duplicate key update "+columns.map{|c| options[:updates][c] || "#{c}=values(#{c})"}.join(",") if options[:update]).to_s

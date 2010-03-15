@@ -40,6 +40,21 @@ module ActiveRecord
             SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :foo=>100)
           end.should raise_error(RuntimeError)
         end
+
+        it "should refuse :replace with :ignore, :async, :update or :updates" do
+          lambda do
+            SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :replace=>true, :ignore=>true)
+          end.should raise_error(RuntimeError)
+          lambda do
+            SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :replace=>true, :async=>true)
+          end.should raise_error(RuntimeError)
+          lambda do
+            SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :replace=>true, :update=>true)
+          end.should raise_error(RuntimeError)
+          lambda do
+            SaveMany::Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS, :replace=>true, :updates=>true)
+          end.should raise_error(RuntimeError)
+        end
       end
 
       describe "slice_array" do
@@ -174,6 +189,12 @@ module ActiveRecord
         k=new_ar_stub("Foo", [:foo], "foos", "insert ignore into foos (foo) values ('foofoo')")
         kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
         k.save_many([kinst], :columns=>["foo"], :ignore=>true)
+      end
+
+      it "should generate replace sql if :replace param given" do
+        k=new_ar_stub("Foo", [:foo], "foos", "replace into foos (foo) values ('foofoo')")
+        kinst = new_ar_inst(k, nil, true, {"foo"=>"foofoo"})
+        k.save_many([kinst], :columns=>["foo"], :replace=>true)
       end
 
       it "should generate update sql with all columns if :update given" do
