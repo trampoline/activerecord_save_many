@@ -68,25 +68,18 @@ module ActiveRecord
       end
 
       describe "add_columns" do
-        it "should add a type column to an indirect inheritor of ActiveRecord::Base" do
-          klass = new_named_class(new_ar_class("Foo"), "Bar")
-          columns, values = SaveMany::Functions::add_columns(klass, [["foo"]], :columns=>[:foo])
-          columns.should == [:type, :foo]
-          values.should == [["Bar", "foo"]]
+        it "should add the class columns if no explicit columns are given" do
+          klass = new_ar_class("Foo") { class << self ; def column_names() ; ["foo"] ; end ; end }
+          columns, values = SaveMany::Functions::add_columns(klass, [["foodata"]], {})
+          columns.should == ["foo"]
+          values.should == [["foodata"]]
         end
 
-        it "should not add a type column if already present" do
-          klass = new_named_class(new_ar_class("Foo"), "Bar")
-          columns, values = SaveMany::Functions::add_columns(klass, [["foo", "Baz"]], :columns=>[:foo, :type])
-          columns.should == [:foo, :type]
-          values.should == [["foo", "Baz"]]
-        end
-
-        it "should not add a type column to a direct inheritor of ActiveRecord::Base" do
-          klass = new_ar_class("Foo")
-          columns, values = SaveMany::Functions::add_columns(klass, [["foo"]], :columns=>[:foo])
-          columns.should == [:foo]
-          values.should == [["foo"]]
+        it "should use the explicitly given columns if given" do
+          klass = new_ar_class("Foo") { class << self ; def column_names() ; ["foo"] ; end ; end }
+          columns, values = SaveMany::Functions::add_columns(klass, [["foodata", "bardata"]], {:columns=>[:foo, :bar]})
+          columns.should == [:foo, :bar]
+          values.should == [["foodata", "bardata"]]
         end
       end
     end
@@ -121,6 +114,7 @@ module ActiveRecord
         stub(k).table_name{tablename}
         cns = column_names.map{|cn| col=Object.new ; stub(col).name{cn} ; col}
         stub(k).columns{cns}
+        stub(k).column_names{column_names}
         stub(k).quote_value{|v| "'#{v}'"}
         connection = ActiveRecord::ConnectionAdapters::MysqlAdapter.new
         stub(connection).execute_raw{|sql| 

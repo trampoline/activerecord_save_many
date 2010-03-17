@@ -42,14 +42,7 @@ module ActiveRecord
       module_function :slice_array
 
       def add_columns(klass, values, options)
-        columns = options[:columns] || klass.columns.map(&:name)
-
-        # add a :type column automatically for STI, if not already present
-        if klass.superclass!=ActiveRecord::Base && !columns.include?(:type)
-          columns = [:type, *columns]
-          values = values.map{|vals| [klass.to_s, *vals]}
-        end
-
+        columns = options[:columns] || klass.column_names
         [columns, values]
       end
       module_function :add_columns
