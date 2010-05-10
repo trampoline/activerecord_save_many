@@ -57,6 +57,22 @@ module ActiveRecord
         @save_many_max_rows || ActiveRecord::SaveMany::default_max_rows
       end
 
+      def set_create_timestamps(timestamp, instance)
+        if instance.record_timestamps
+          instance.write_attribute('created_at', timestamp) if instance.respond_to?(:created_at) && instance.created_at.nil?
+          instance.write_attribute('created_on', timestamp) if instance.respond_to?(:created_on) && instance.created_on.nil?
+          instance.write_attribute('updated_at', timestamp) if instance.respond_to?(:updated_at) && instance.updated_at.nil?
+          instance.write_attribute('updated_on', timestamp) if instance.respond_to?(:updated_on) && instance.updated_on.nil?
+        end
+      end
+
+      def set_update_timestamps(timestamp, instance)
+        if instance.record_timestamps
+          instance.write_attribute('updated_at', timestamp) if instance.respond_to?(:updated_at)
+          instance.write_attribute('updated_on', timestamp) if instance.respond_to?(:updated_on)
+        end
+      end
+
       def save_many(values, options={})
         Functions::check_options(ActiveRecord::SaveMany::OPTIONS_KEYS , options)
         return if values.nil? || values.empty?
@@ -67,14 +83,17 @@ module ActiveRecord
         max_rows = options[:max_rows] || save_many_max_rows
         batches = Functions::slice_array(max_rows, values)
 
+        timestamp = Time.now
         batches.each do |rows|
           rows = rows.map do |obj|
             if obj.is_a? ActiveRecord::Base
               obj.send( :callback, :before_save )
               if obj.id
                 obj.send( :callback, :before_update)
+                set_update_timestamps(timestamp, obj)
               else
                 obj.send( :callback, :before_create )
+                set_create_timestamps(timestamp, obj)
               end
               raise "#{obj.errors.full_messages.join(', ')}" if !obj.valid?
             end

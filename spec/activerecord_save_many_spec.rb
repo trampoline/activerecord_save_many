@@ -135,6 +135,8 @@ module ActiveRecord
         end
         mock(kinst).valid?(){valid}
 
+        mock(kinst).record_timestamps(){true}
+
         field_hash.keys.each{ |key|
           mock(kinst).[](key){field_hash[key]}
         }
