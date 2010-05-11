@@ -107,10 +107,62 @@ module ActiveRecord
       k2.save_many_max_rows.should == 100
     end
 
+    describe "set_create_timestamps" do
+      it "should set creation timestamps" do
+        k = new_ar_class("Foo") {
+          attr_accessor :created_at
+          attr_accessor :created_on
+          attr_accessor :updated_at
+          attr_accessor :updated_on
+          def write_attribute(name,value)
+            self.send(name+"=", value)
+          end
+        }
+        kinst = k.new
+        stub(kinst).record_timestamps{true}
+
+        t = Time.now
+        k.set_create_timestamps(t,kinst)
+        kinst.created_at.should == t
+        kinst.created_on.should == t
+        kinst.updated_at.should == t
+        kinst.updated_on.should == t
+      end
+    end
+
+    describe "set_update_timestamps" do
+      it "should set update timestamps" do
+        k = new_ar_class("Foo") {
+          attr_accessor :created_at
+          attr_accessor :created_on
+          attr_accessor :updated_at
+          attr_accessor :updated_on
+          def write_attribute(name,value)
+            self.send(name+"=", value)
+          end
+        }
+        kinst = k.new
+        stub(kinst).record_timestamps{true}
+
+        t = Time.now
+        k.set_update_timestamps(t,kinst)
+        kinst.created_at.should == nil
+        kinst.created_on.should == nil
+        kinst.updated_at.should == t
+        kinst.updated_on.should == t
+      end
+    end
+
     # argh. am i really testing the correct sql is generated ?
     describe "save_many" do
       def new_ar_stub(classname, column_names, tablename, match_sql)
-        k=new_ar_class(classname)
+        k=new_ar_class(classname) {
+          attr_accessor :created_at
+          attr_accessor :updated_at
+          def write_attribute(name,value)
+            self.send(name+"=", value)
+          end
+        }
         stub(k).table_name{tablename}
         cns = column_names.map{|cn| col=Object.new ; stub(col).name{cn} ; col}
         stub(k).columns{cns}
@@ -147,6 +199,8 @@ module ActiveRecord
         k=new_ar_stub("Foo", [:foo, :bar], "foos", "insert into foos (foo,bar) values ('foofoo','barbar')")
         kinst = new_ar_inst(k, nil, true, {:foo=>"foofoo", :bar=>"barbar"})
         k.save_many([kinst])
+        kinst.created_at.should_not == nil
+        kinst.updated_at.should_not == nil
       end
 
       it "should generate extended insert sql for all model columns with existing objects" do

@@ -11,7 +11,7 @@ begin
     gem.homepage = "http://github.com/trampoline/activerecord_save_many"
     gem.authors = ["mccraigmccraig"]
     gem.add_dependency "activerecord_execute_raw", ">= 0.1.0"
-    gem.add_development_dependency "rspec", ">= 1.2.9"
+    gem.add_development_dependency "rspec", ">= 1.2.8"
     gem.add_development_dependency "yard", ">= 0"
     gem.add_development_dependency "rr", ">= 0.10.5"
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
